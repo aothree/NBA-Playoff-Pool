@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const db = require('./db/index');
 
 const PORT = process.env.PORT || 3000;
@@ -13,7 +14,12 @@ async function start() {
   const app = express();
 
   // Middleware
-  app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173'] }));
+  if (process.env.NODE_ENV === 'production') {
+    // In production, frontend is served from the same origin — no CORS needed
+    app.use(cors());
+  } else {
+    app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173'] }));
+  }
   app.use(express.json());
 
   // Routes (loaded after db is ready)
@@ -30,6 +36,17 @@ async function start() {
   app.get('/api/health', (req, res) => {
     res.json({ success: true, data: { status: 'ok', timestamp: new Date().toISOString() } });
   });
+
+  // Production: serve React build
+  if (process.env.NODE_ENV === 'production') {
+    const clientBuild = path.join(__dirname, '..', 'client', 'dist');
+    app.use(express.static(clientBuild));
+
+    // All non-API routes serve index.html (React Router handles them)
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(clientBuild, 'index.html'));
+    });
+  }
 
   app.listen(PORT, () => {
     console.log(`NBA Playoff Pool server running on http://localhost:${PORT}`);
