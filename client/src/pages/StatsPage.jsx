@@ -31,18 +31,26 @@ export default function StatsPage() {
 
     return first.series_details.map(sd => {
       const picksForSeries = {};
+      const scorerPicks = {};
       for (const entry of leaderboard) {
         const detail = entry.series_details.find(d => d.series_id === sd.series_id);
         if (detail && detail.has_pick && detail.pick_winner) {
           const key = `${detail.pick_winner} in ${detail.pick_games}`;
           picksForSeries[key] = (picksForSeries[key] || 0) + 1;
         }
+        if (detail && detail.has_pick && detail.pick_leading_scorer) {
+          scorerPicks[detail.pick_leading_scorer] = (scorerPicks[detail.pick_leading_scorer] || 0) + 1;
+        }
       }
       const sorted = Object.entries(picksForSeries)
         .map(([pick, count]) => ({ pick, count, pct: Math.round((count / leaderboard.length) * 100) }))
         .sort((a, b) => b.count - a.count);
 
-      return { ...sd, topPicks: sorted.slice(0, 3), totalPickers: leaderboard.length };
+      const sortedScorers = Object.entries(scorerPicks)
+        .map(([pick, count]) => ({ pick, count, pct: Math.round((count / leaderboard.length) * 100) }))
+        .sort((a, b) => b.count - a.count);
+
+      return { ...sd, topPicks: sorted.slice(0, 3), topScorers: sortedScorers.slice(0, 3), totalPickers: leaderboard.length };
     });
   }, [leaderboard]);
 
@@ -147,6 +155,31 @@ export default function StatsPage() {
                   </div>
                 ) : (
                   <p className="text-gray-500 text-xs">No picks yet</p>
+                )}
+                {s.topScorers.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-800">
+                    <p className="text-xs text-gray-500 mb-2">Leading Scorer Picks</p>
+                    <div className="space-y-1.5">
+                      {s.topScorers.map((tp, i) => (
+                        <div key={tp.pick} className="flex items-center gap-3">
+                          <span className={`text-xs font-bold w-5 ${i === 0 ? 'text-blue-400' : 'text-gray-500'}`}>
+                            {i + 1}.
+                          </span>
+                          <div className="flex-1 bg-gray-800 rounded-full h-6 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full flex items-center px-3 text-xs font-semibold ${i === 0 ? 'bg-blue-500/30 text-blue-300' : 'bg-gray-700 text-gray-300'}`}
+                              style={{ width: `${Math.max(tp.pct, 15)}%` }}
+                            >
+                              {tp.pick}
+                            </div>
+                          </div>
+                          <span className="text-xs text-gray-400 w-16 text-right">
+                            {tp.count} ({tp.pct}%)
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
                 {s.is_complete ? (
                   <div className="mt-3 pt-3 border-t border-gray-800 text-xs">

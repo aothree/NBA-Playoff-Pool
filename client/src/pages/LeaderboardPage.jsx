@@ -51,13 +51,14 @@ function MainEventTable({ data, currentUser }) {
               </tr>
               {expanded[entry.user_id] && (
                 <tr className="border-b border-gray-800">
-                  <td colSpan={4 + ALL_ROUNDS.length} className="pb-3 px-2">
+                  <td colSpan={5 + ALL_ROUNDS.length} className="pb-3 px-2">
                     <div className="bg-gray-800/50 rounded-lg overflow-hidden mt-1">
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="text-gray-500 uppercase border-b border-gray-700">
                             <th className="text-left py-2 px-3">Matchup</th>
-                            <th className="text-left py-2 px-3">Your Pick</th>
+                            <th className="text-left py-2 px-3">Pick</th>
+                            <th className="text-left py-2 px-3">Scorer Pick</th>
                             <th className="text-left py-2 px-3">Result</th>
                             <th className="text-right py-2 px-3">Win</th>
                             <th className="text-right py-2 px-3">Games</th>
@@ -74,6 +75,7 @@ function MainEventTable({ data, currentUser }) {
                               <tr key={sd.series_id} className="border-b border-gray-700/50">
                                 <td className="py-2 px-3 text-gray-300">{sd.matchup}</td>
                                 <td className="py-2 px-3 text-gray-200">{pickStr}</td>
+                                <td className="py-2 px-3 text-gray-300">{sd.pick_leading_scorer || '—'}</td>
                                 <td className={`py-2 px-3 ${pending ? 'text-gray-500' : 'text-green-400'}`}>
                                   {resultStr}
                                 </td>
