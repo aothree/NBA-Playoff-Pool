@@ -4,9 +4,22 @@ const fs = require('fs');
 const path = require('path');
 
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
-const DB_PATH = path.join(__dirname, '../../data/pool.db');
+const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, '../../data/pool.db');
 
 async function seed() {
+  // ═══ PRODUCTION SAFETY GUARD ═══════════════════════════════════════════════
+  // This script DELETES the entire database and recreates it from scratch.
+  // It must NEVER run in production. If you need to modify production data,
+  // write a migration script instead.
+  if (process.env.NODE_ENV === 'production') {
+    console.error('╔══════════════════════════════════════════════════════════╗');
+    console.error('║  SEED BLOCKED — cannot run seed in production!          ║');
+    console.error('║  This would DELETE all users, picks, and results.       ║');
+    console.error('║  Use a migration script for production DB changes.      ║');
+    console.error('╚══════════════════════════════════════════════════════════╝');
+    process.exit(1);
+  }
+
   // Delete existing DB for a clean reseed
   if (fs.existsSync(DB_PATH)) {
     fs.unlinkSync(DB_PATH);
