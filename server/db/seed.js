@@ -40,10 +40,10 @@ async function seed() {
       VALUES ('2025-26', 1, 50, 0, '[]', '[]')
     `).run().lastInsertRowid;
 
-    // ── Round 1 (locks April 18, 2026 before first tip) ─────────────────────
+    // ── Round 1 (no auto-lock — admin controls locks manually) ──────────────
     const roundId = db.prepare(`
       INSERT INTO rounds (season_id, round_number, name, picks_lock_datetime, is_active)
-      VALUES (?, 1, 'First Round', '2026-04-18T16:00:00.000Z', 1)
+      VALUES (?, 1, 'First Round', NULL, 1)
     `).run(seasonId).lastInsertRowid;
 
     // ── Teams (20 total: 16 playoff + 4 play-in extras) ─────────────────────
@@ -52,26 +52,26 @@ async function seed() {
     const team = {};
     // EAST
     team.DET = t.run(seasonId, 'Detroit Pistons',        'DET', 'East', 1).lastInsertRowid;
-    team.CHA = t.run(seasonId, 'Charlotte Hornets',      'CHA', 'East', 8).lastInsertRowid;
     team.BOS = t.run(seasonId, 'Boston Celtics',         'BOS', 'East', 2).lastInsertRowid;
-    team.PHI = t.run(seasonId, 'Philadelphia 76ers',     'PHI', 'East', 7).lastInsertRowid;
     team.NYK = t.run(seasonId, 'New York Knicks',        'NYK', 'East', 3).lastInsertRowid;
-    team.ATL = t.run(seasonId, 'Atlanta Hawks',          'ATL', 'East', 6).lastInsertRowid;
     team.CLE = t.run(seasonId, 'Cleveland Cavaliers',    'CLE', 'East', 4).lastInsertRowid;
     team.TOR = t.run(seasonId, 'Toronto Raptors',        'TOR', 'East', 5).lastInsertRowid;
+    team.ATL = t.run(seasonId, 'Atlanta Hawks',          'ATL', 'East', 6).lastInsertRowid;
+    team.PHI = t.run(seasonId, 'Philadelphia 76ers',     'PHI', 'East', 7).lastInsertRowid;
+    team.ORL = t.run(seasonId, 'Orlando Magic',          'ORL', 'East', 8).lastInsertRowid;
     // WEST
     team.OKC = t.run(seasonId, 'Oklahoma City Thunder',  'OKC', 'West', 1).lastInsertRowid;
-    team.POR = t.run(seasonId, 'Portland Trail Blazers', 'POR', 'West', 8).lastInsertRowid;
     team.SAS = t.run(seasonId, 'San Antonio Spurs',      'SAS', 'West', 2).lastInsertRowid;
-    team.PHX = t.run(seasonId, 'Phoenix Suns',           'PHX', 'West', 7).lastInsertRowid;
     team.DEN = t.run(seasonId, 'Denver Nuggets',         'DEN', 'West', 3).lastInsertRowid;
-    team.MIN = t.run(seasonId, 'Minnesota Timberwolves', 'MIN', 'West', 6).lastInsertRowid;
     team.LAL = t.run(seasonId, 'Los Angeles Lakers',     'LAL', 'West', 4).lastInsertRowid;
     team.HOU = t.run(seasonId, 'Houston Rockets',        'HOU', 'West', 5).lastInsertRowid;
+    team.MIN = t.run(seasonId, 'Minnesota Timberwolves', 'MIN', 'West', 6).lastInsertRowid;
+    team.POR = t.run(seasonId, 'Portland Trail Blazers', 'POR', 'West', 7).lastInsertRowid;
+    team.PHX = t.run(seasonId, 'Phoenix Suns',           'PHX', 'West', 8).lastInsertRowid;
     // EXTRAS (play-in contenders — for future rounds)
     team.LAC = t.run(seasonId, 'LA Clippers',            'LAC', 'West', 0).lastInsertRowid;
     team.GSW = t.run(seasonId, 'Golden State Warriors',  'GSW', 'West', 0).lastInsertRowid;
-    team.ORL = t.run(seasonId, 'Orlando Magic',          'ORL', 'East', 0).lastInsertRowid;
+    team.CHA = t.run(seasonId, 'Charlotte Hornets',      'CHA', 'East', 0).lastInsertRowid;
     team.MIA = t.run(seasonId, 'Miami Heat',             'MIA', 'East', 0).lastInsertRowid;
     console.log('Created 20 teams');
 
@@ -91,20 +91,6 @@ async function seed() {
     p.run(team.DET, 'Chaz Lanier', 'G');
     p.run(team.DET, 'Ausar Thompson', 'F');
     p.run(team.DET, 'Isaiah Stewart', 'C');
-
-    // Charlotte Hornets
-    p.run(team.CHA, 'LaMelo Ball', 'G');
-    p.run(team.CHA, 'Miles Bridges', 'F');
-    p.run(team.CHA, 'Coby White', 'G');
-    p.run(team.CHA, 'Josh Green', 'G');
-    p.run(team.CHA, 'Grant Williams', 'F');
-    p.run(team.CHA, 'Kon Knueppel', 'G');
-    p.run(team.CHA, 'Nick Smith Jr.', 'G');
-    p.run(team.CHA, 'Pat Connaughton', 'G');
-    p.run(team.CHA, 'Liam McNeeley', 'F');
-    p.run(team.CHA, 'Mike Conley', 'G');
-    p.run(team.CHA, 'Moussa Diabate', 'F');
-    p.run(team.CHA, 'Sion James', 'G');
 
     // Boston Celtics
     p.run(team.BOS, 'Jayson Tatum', 'F');
@@ -183,6 +169,18 @@ async function seed() {
     p.run(team.TOR, 'Ja\'Kobe Walter', 'G');
     p.run(team.TOR, 'Trayce Jackson-Davis', 'F');
     p.run(team.TOR, 'Chris Boucher', 'F');
+
+    // Orlando Magic
+    p.run(team.ORL, 'Paolo Banchero', 'F');
+    p.run(team.ORL, 'Franz Wagner', 'F');
+    p.run(team.ORL, 'Jalen Suggs', 'G');
+    p.run(team.ORL, 'Wendell Carter Jr.', 'C');
+    p.run(team.ORL, 'Cole Anthony', 'G');
+    p.run(team.ORL, 'Jonathan Isaac', 'F');
+    p.run(team.ORL, 'Kentavious Caldwell-Pope', 'G');
+    p.run(team.ORL, 'Gary Harris', 'G');
+    p.run(team.ORL, 'Moritz Wagner', 'C');
+    p.run(team.ORL, 'Anthony Black', 'G');
 
     // Oklahoma City Thunder
     p.run(team.OKC, 'Shai Gilgeous-Alexander', 'G');
@@ -290,7 +288,21 @@ async function seed() {
     p.run(team.HOU, 'Jeff Green', 'F');
     p.run(team.HOU, 'Steven Adams', 'C');
 
-    // ── Extra Teams (play-in contenders) ────────────────────────────────────
+    // ── Extra Team Rosters ─────────────────────────────────────────────────
+
+    // Charlotte Hornets
+    p.run(team.CHA, 'LaMelo Ball', 'G');
+    p.run(team.CHA, 'Miles Bridges', 'F');
+    p.run(team.CHA, 'Coby White', 'G');
+    p.run(team.CHA, 'Josh Green', 'G');
+    p.run(team.CHA, 'Grant Williams', 'F');
+    p.run(team.CHA, 'Kon Knueppel', 'G');
+    p.run(team.CHA, 'Nick Smith Jr.', 'G');
+    p.run(team.CHA, 'Pat Connaughton', 'G');
+    p.run(team.CHA, 'Liam McNeeley', 'F');
+    p.run(team.CHA, 'Mike Conley', 'G');
+    p.run(team.CHA, 'Moussa Diabate', 'F');
+    p.run(team.CHA, 'Sion James', 'G');
 
     // LA Clippers
     p.run(team.LAC, 'James Harden', 'G');
@@ -316,18 +328,6 @@ async function seed() {
     p.run(team.GSW, 'Buddy Hield', 'G');
     p.run(team.GSW, 'Lindy Waters III', 'G');
 
-    // Orlando Magic
-    p.run(team.ORL, 'Paolo Banchero', 'F');
-    p.run(team.ORL, 'Franz Wagner', 'F');
-    p.run(team.ORL, 'Jalen Suggs', 'G');
-    p.run(team.ORL, 'Wendell Carter Jr.', 'C');
-    p.run(team.ORL, 'Cole Anthony', 'G');
-    p.run(team.ORL, 'Jonathan Isaac', 'F');
-    p.run(team.ORL, 'Kentavious Caldwell-Pope', 'G');
-    p.run(team.ORL, 'Gary Harris', 'G');
-    p.run(team.ORL, 'Moritz Wagner', 'C');
-    p.run(team.ORL, 'Anthony Black', 'G');
-
     // Miami Heat
     p.run(team.MIA, 'Bam Adebayo', 'C');
     p.run(team.MIA, 'Tyler Herro', 'G');
@@ -348,12 +348,12 @@ async function seed() {
       VALUES (?, ?, ?, ?, ?)
     `);
 
-    s.run(roundId, team.DET, team.CHA, 'East', 1);  // (1) Pistons vs (8) Hornets
+    s.run(roundId, team.DET, team.ORL, 'East', 1);  // (1) Pistons vs (8) Magic
     s.run(roundId, team.BOS, team.PHI, 'East', 2);  // (2) Celtics vs (7) 76ers
     s.run(roundId, team.NYK, team.ATL, 'East', 3);  // (3) Knicks vs (6) Hawks
     s.run(roundId, team.CLE, team.TOR, 'East', 4);  // (4) Cavaliers vs (5) Raptors
-    s.run(roundId, team.OKC, team.POR, 'West', 5);  // (1) Thunder vs (8) Blazers
-    s.run(roundId, team.SAS, team.PHX, 'West', 6);  // (2) Spurs vs (7) Suns
+    s.run(roundId, team.OKC, team.PHX, 'West', 5);  // (1) Thunder vs (8) Suns
+    s.run(roundId, team.SAS, team.POR, 'West', 6);  // (2) Spurs vs (7) Blazers
     s.run(roundId, team.DEN, team.MIN, 'West', 7);  // (3) Nuggets vs (6) Wolves
     s.run(roundId, team.LAL, team.HOU, 'West', 8);  // (4) Lakers vs (5) Rockets
     console.log('Created 8 Round 1 series matchups');

@@ -103,7 +103,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-950 text-white">
       <Navbar />
       <Routes>
-        <Route path="/" element={isAuthenticated ? <Dashboard /> : <LandingPage />} />
+        <Route path="/" element={isAuthenticated ? <Navigate to="/leaderboard" replace /> : <LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
