@@ -82,6 +82,9 @@ export const patchUser = (id, data) =>
 export const getAdminPicks = () =>
   api.get('/api/admin/picks').then(r => r.data);
 
+export const postAdminPick = (data) =>
+  api.post('/api/admin/picks', data).then(r => r.data);
+
 export const postSeriesResult = (seriesId, data) =>
   api.post(`/api/admin/series/${seriesId}/result`, data).then(r => r.data);
 

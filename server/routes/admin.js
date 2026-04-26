@@ -386,6 +386,39 @@ router.delete('/players/:id', (req, res) => {
   }
 });
 
+// POST /api/admin/picks — submit picks on behalf of any user (bypasses lock checks)
+router.post('/picks', (req, res) => {
+  try {
+    const { user_id, series_id, pick_winner_team_id, pick_games, pick_leading_scorer } = req.body;
+    if (!user_id || !series_id || !pick_winner_team_id || !pick_games) {
+      return res.status(400).json({ success: false, error: 'user_id, series_id, pick_winner_team_id, pick_games are required' });
+    }
+
+    // Verify user and series exist
+    const user = db.prepare('SELECT id, name FROM users WHERE id = ?').get(user_id);
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+    const series = db.prepare('SELECT id FROM series WHERE id = ?').get(series_id);
+    if (!series) return res.status(404).json({ success: false, error: 'Series not found' });
+
+    db.prepare(`
+      INSERT INTO picks (user_id, series_id, pick_winner_team_id, pick_games, pick_leading_scorer, submitted_at)
+      VALUES (?, ?, ?, ?, ?, datetime('now'))
+      ON CONFLICT(user_id, series_id) DO UPDATE SET
+        pick_winner_team_id = excluded.pick_winner_team_id,
+        pick_games = excluded.pick_games,
+        pick_leading_scorer = excluded.pick_leading_scorer,
+        submitted_at = excluded.submitted_at
+    `).run(user_id, series_id, pick_winner_team_id, pick_games, pick_leading_scorer || null);
+
+    const pick = db.prepare('SELECT * FROM picks WHERE user_id = ? AND series_id = ?').get(user_id, series_id);
+    return res.json({ success: true, data: pick });
+  } catch (err) {
+    console.error('admin/picks POST error:', err);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
 // GET /api/admin/users
 router.get('/users', (req, res) => {
   try {

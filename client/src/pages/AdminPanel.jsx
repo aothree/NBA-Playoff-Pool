@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   getAdminUsers, patchUser,
-  getAdminPicks, postSeriesResult,
+  getAdminPicks, postAdminPick, postSeriesResult,
   getCurrentRound, getRoundSeries, putRound, postRound,
   getAdminTeams, getAdminStats, getAdminSeason, postSeason,
   getAdminPayouts, postPayout, putPayout,
@@ -403,12 +403,23 @@ function RoundsTab() {
             </div>
             <div>
               <label className="label">Default Picks Lock (fallback for series without their own lock time)</label>
-              <input
-                className="input text-sm"
-                type="datetime-local"
-                value={form.picks_lock_datetime}
-                onChange={e => setForm(f => ({ ...f, picks_lock_datetime: e.target.value }))}
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  className="input text-sm flex-1"
+                  type="datetime-local"
+                  value={form.picks_lock_datetime}
+                  onChange={e => setForm(f => ({ ...f, picks_lock_datetime: e.target.value }))}
+                />
+                {form.picks_lock_datetime && (
+                  <button
+                    className="text-xs bg-red-900/40 text-red-400 hover:bg-red-900/60 px-3 py-2 rounded font-medium whitespace-nowrap"
+                    onClick={() => setForm(f => ({ ...f, picks_lock_datetime: '' }))}
+                  >
+                    Clear Lock
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Leave empty for no auto-lock (admin controls locks manually).</p>
             </div>
             <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
               <input
@@ -1444,6 +1455,206 @@ function OverviewTab() {
   );
 }
 
+// ─── Enter Picks Tab (admin enters picks on behalf of users) ─────────────────
+function EnterPicksTab() {
+  const [users, setUsers] = useState([]);
+  const [seriesData, setSeriesData] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [rosters, setRosters] = useState([]);
+  const [selectedUser, setSelectedUser] = useState('');
+  const [picks, setPicks] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const load = useCallback(async () => {
+    try {
+      const [usersRes, picksRes, teamsRes, rostersRes] = await Promise.all([
+        getAdminUsers(),
+        getAdminPicks(),
+        getAdminTeams(),
+        getAdminRosters(),
+      ]);
+      if (usersRes.success) setUsers(usersRes.data);
+      if (picksRes.success) setSeriesData(picksRes.data);
+      if (teamsRes.success) setTeams(teamsRes.data);
+      if (rostersRes.success) setRosters(rostersRes.data);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  // When user changes, load their existing picks
+  useEffect(() => {
+    if (!selectedUser || !seriesData.length) { setPicks({}); return; }
+    const userPicks = {};
+    for (const s of seriesData) {
+      const existing = s.picks.find(p => p.user_id === parseInt(selectedUser));
+      if (existing) {
+        userPicks[s.id] = {
+          pick_winner_team_id: String(existing.pick_winner_team_id),
+          pick_games: String(existing.pick_games),
+          pick_leading_scorer: existing.pick_leading_scorer || '',
+        };
+      }
+    }
+    setPicks(userPicks);
+  }, [selectedUser, seriesData]);
+
+  const updatePick = (seriesId, field, value) => {
+    setPicks(prev => ({
+      ...prev,
+      [seriesId]: { ...prev[seriesId], [field]: value },
+    }));
+  };
+
+  const getPlayersForSeries = (s) => {
+    const htRoster = rosters.find(t => t.name === s.ht_name);
+    const ltRoster = rosters.find(t => t.name === s.lt_name);
+    return [
+      ...(htRoster?.players || []).map(p => ({ ...p, teamName: s.ht_name })),
+      ...(ltRoster?.players || []).map(p => ({ ...p, teamName: s.lt_name })),
+    ].sort((a, b) => a.name.localeCompare(b.name));
+  };
+
+  const handleSaveAll = async () => {
+    if (!selectedUser) return;
+    setSaving(true);
+    setMsg(null);
+    let saved = 0;
+    let errors = 0;
+
+    for (const [seriesId, pick] of Object.entries(picks)) {
+      if (!pick.pick_winner_team_id || !pick.pick_games) continue;
+      try {
+        const res = await postAdminPick({
+          user_id: parseInt(selectedUser),
+          series_id: parseInt(seriesId),
+          pick_winner_team_id: parseInt(pick.pick_winner_team_id),
+          pick_games: parseInt(pick.pick_games),
+          pick_leading_scorer: pick.pick_leading_scorer || null,
+        });
+        if (res.success) saved++;
+        else errors++;
+      } catch {
+        errors++;
+      }
+    }
+
+    setSaving(false);
+    if (errors === 0) {
+      setMsg({ type: 'success', text: `Saved ${saved} pick${saved !== 1 ? 's' : ''} for ${users.find(u => u.id === parseInt(selectedUser))?.name}` });
+    } else {
+      setMsg({ type: 'error', text: `Saved ${saved}, failed ${errors}` });
+    }
+    load(); // refresh picks data
+  };
+
+  if (loading) return <div className="text-gray-400 py-4">Loading...</div>;
+
+  const htTeamForSeries = (s) => teams.find(t => t.name === s.ht_name);
+  const ltTeamForSeries = (s) => teams.find(t => t.name === s.lt_name);
+
+  return (
+    <div className="space-y-4">
+      {msg && (
+        <div className={`text-sm px-4 py-2 rounded-lg ${msg.type === 'success' ? 'bg-green-900/40 text-green-400' : 'bg-red-900/40 text-red-400'}`}>
+          {msg.text}
+        </div>
+      )}
+
+      <div>
+        <label className="label">Select User</label>
+        <select
+          className="input text-sm w-full max-w-xs"
+          value={selectedUser}
+          onChange={e => setSelectedUser(e.target.value)}
+        >
+          <option value="">— Choose a user —</option>
+          {users.map(u => (
+            <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+          ))}
+        </select>
+      </div>
+
+      {selectedUser && seriesData.map(s => {
+        const ht = htTeamForSeries(s);
+        const lt = ltTeamForSeries(s);
+        const pick = picks[s.id] || {};
+        const players = getPlayersForSeries(s);
+
+        return (
+          <div key={s.id} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <span className="text-xs text-gray-500">{s.round_name} — {s.conference}</span>
+                <h3 className="text-sm font-bold text-white">
+                  ({s.ht_seed}) {s.ht_name} vs ({s.lt_seed}) {s.lt_name}
+                </h3>
+              </div>
+              {pick.pick_winner_team_id && (
+                <span className="text-xs bg-green-900/40 text-green-400 px-2 py-0.5 rounded font-medium">Has Pick</span>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="label">Winner</label>
+                <select
+                  className="input text-sm"
+                  value={pick.pick_winner_team_id || ''}
+                  onChange={e => updatePick(s.id, 'pick_winner_team_id', e.target.value)}
+                >
+                  <option value="">Select</option>
+                  {ht && <option value={ht.id}>{s.ht_name}</option>}
+                  {lt && <option value={lt.id}>{s.lt_name}</option>}
+                </select>
+              </div>
+              <div>
+                <label className="label">Games</label>
+                <select
+                  className="input text-sm"
+                  value={pick.pick_games || ''}
+                  onChange={e => updatePick(s.id, 'pick_games', e.target.value)}
+                >
+                  <option value="">Select</option>
+                  {[4, 5, 6, 7].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="label">Leading Scorer</label>
+                <select
+                  className="input text-sm"
+                  value={pick.pick_leading_scorer || ''}
+                  onChange={e => updatePick(s.id, 'pick_leading_scorer', e.target.value)}
+                >
+                  <option value="">Select</option>
+                  {players.map(p => (
+                    <option key={p.id} value={p.name}>{p.name} ({p.teamName})</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      {selectedUser && (
+        <div className="sticky bottom-4 flex justify-end">
+          <button
+            className="btn-primary py-2 px-6 text-sm font-bold shadow-lg"
+            onClick={handleSaveAll}
+            disabled={saving}
+          >
+            {saving ? 'Saving...' : 'Save All Picks'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Admin Panel Container ────────────────────────────────────────────────────
 export default function AdminPanel() {
   const [tab, setTab] = useState('overview');
@@ -1453,6 +1664,7 @@ export default function AdminPanel() {
     { id: 'results', label: 'Results' },
     { id: 'matchups', label: 'Matchups' },
     { id: 'users', label: 'Users' },
+    { id: 'enterpicks', label: 'Enter Picks' },
     { id: 'rosters', label: 'Rosters' },
     { id: 'rounds', label: 'Rounds' },
     { id: 'settings', label: 'Settings' },
@@ -1463,7 +1675,7 @@ export default function AdminPanel() {
       <h1 className="text-2xl font-bold text-white mb-6">Admin Panel</h1>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-700 mb-6">
+      <div className="flex flex-wrap border-b border-gray-700 mb-6">
         {tabs.map(t => (
           <button
             key={t.id}
@@ -1480,6 +1692,7 @@ export default function AdminPanel() {
         {tab === 'results' && <ResultsTab />}
         {tab === 'matchups' && <MatchupsTab />}
         {tab === 'users' && <UsersTab />}
+        {tab === 'enterpicks' && <EnterPicksTab />}
         {tab === 'rosters' && <RostersTab />}
         {tab === 'rounds' && <RoundsTab />}
         {tab === 'settings' && <SettingsTab />}
